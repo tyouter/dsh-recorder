@@ -73,3 +73,81 @@ it easy to misdiagnose. Two habits fix this:
 - **No captioning / cursor overlay.** The frames are raw pixels: no zoom, no pointer highlight, no
   chapter cards. That work was done in the *re-render* approach (a generated HTML page), which is a
   different instrument and produces a lookalike, not the product.
+
+---
+
+# v0.1 build — what the plugin work measured
+
+Everything below was observed while turning the prototype into `@tyouter/dsh-recorder`.
+
+## Capture
+
+| Fact | Value / behaviour | How it was checked |
+| --- | --- | --- |
+| The Host half is not inside Electron | `require('electron')` from the plugin does not yield `BrowserWindow`; `process.versions.electron` is not available to it | `recorder_windows` → `capture: { backend: "screen", electron: null }` |
+| A screen grab needs DPI awareness | Python starts **DPI-unaware** (`GetProcessDpiAwareness → 0`); `GetWindowRect` then returns logical coordinates while `ImageGrab`'s bbox is physical, so the crop lands on the wrong monitor | first probe recorded an Acrobat window instead of the app; fixed with `SetProcessDpiAwarenessContext(-4)` before any window call |
+| `GetWindowRect` includes invisible borders | a grab showed a sliver of the window underneath along the bottom edge | switched to `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)` |
+| `SetForegroundWindow` is refused from the Host-spawned process | returns 0; `GetForegroundWindow` stays on the previous app | probe after start, `focused: false` |
+| `AttachThreadInput` + `SetForegroundWindow` also failed | `AttachThreadInput` returned 0 | diagnostic |
+| **minimize + restore does bring it forward** | `ShowWindow(SW_MINIMIZE)` → 250 ms → `ShowWindow(SW_RESTORE)` → `GetForegroundWindow == hwnd` | diagnostic; also worked through the plugin |
+| A window can be taller than the screen | the app window was 1603×1021 at y=192 on a 1080-tall work area; the grab showed the taskbar and black off-screen rows | probe image |
+| Maximize + restore keeps footage clean | `ShowWindow(SW_MAXIMIZE)` → capture 1920×1020 → `SetWindowPlacement(saved)` afterwards | test run, frames inspected |
+| Screen grab has no occlusion handling | whatever is on top at that rectangle is what gets recorded | first two recordings |
+
+## Driving
+
+| Fact | Value / behaviour |
+| --- | --- |
+| The driver can live in the recorder | the client half is in the same page as the target plugin, so it reads and clicks the target's real DOM; **the target plugin needs no change and no dev flag** |
+| The page ↔ Host bridge is a plain route | `GET /recorder/api/poll` hands out one job, `POST /recorder/api/report` completes it; no CDP and no debug port involved |
+| Client half appears without a page reload | after `plugin_manager(set_plugin)` re-enabled the bundle with the page already open, `health.clientConnected` became `true` and driving worked; a later CSS change in `client.js` was live after the next re-enable |
+| Host half does not reload from file edits | a re-enable (`set_plugin` off → on) picked up the new `lib/*.js`; plain file edits were not observed to take effect |
+| Tool results must be lossless JSON | returning an object with an `undefined` field fails the call with `value is not lossless JSON`; strip undefined at the boundary |
+| Synthetic events are enough | native setter + `input`, `setSelectionRange` + `select`, PointerEvent/MouseEvent sequence + `click` all reached the notes panel |
+
+## The verified run
+
+`recorder_demo` with `examples/notes-demo.json`, 6 fps, 1000 px wide:
+
+- 10.79 s, 65 frames, 2 021 KB GIF, three stills (3 s / 6 s / 9 s);
+- every step reported `✓`, including turning Auto-write off, switching to the Capture tab, clearing
+  the draft, typing 62 characters, and selecting 12 characters;
+- the stills show the typed note on the left, its live typeset mirror on the right with the same
+  selection highlighted, the recorder's cursor, and the REC pill with its clock and stop button.
+
+## The panel (v0.2)
+
+| Fact | Value / behaviour |
+| --- | --- |
+| The panel is a `main` page plus a `sidebar.panellist` entry | sidebar id `recorder` matches the `main` key; both registered from the client half |
+| The `main` slot does not pass a session id | the panel cannot name its session, so output root is resolved host-side and exposed as a picker |
+| Output-root resolution | `workspaceRegistry` gives the registered workspaces; a live session's committed cwd (`session.header.cwd`) decides the default. `workingDirectory.defaultDirectory` is the **profile** dir here, not a workspace — do not use it |
+| A live session's cwd can be the profile dir | one of the two live agents had `cwd = ~/.dsh/profiles/desktop`; preferring any live cwd would have written outside the user's projects, so only registered workspace paths are accepted |
+| Panel-triggered runs race the click | the button's `POST /run` reaches the Host while the click step's own job is still pending; `drive()` now waits up to 5 s for the previous job to report |
+| Step progress | the page posts `/recorder/api/progress` after each step; `publicState.progress` feeds both the panel's status line and nothing else (purely cosmetic if missed) |
+| The result survives a panel unmount | a run usually opens another plugin's panel, unmounting the recorder page; on return it shows the newest recording from `GET /recordings` |
+| Assets are served by the Host | `GET /recorder/api/asset?path=…` only serves files under a recordings root, so the panel can show GIFs and probe frames without exposing the filesystem |
+| Cropping by page insets | the panel sends `left,top,right,bottom,scale` in CSS pixels plus `devicePixelRatio`; the Python helper maps them through `GetClientRect`/`ClientToScreen` and crops every frame. No DPI guesswork, and the insets are stable across maximizing |
+| The REC pill moved into the content | it used to sit above the content box (outside a `功能区` crop) but that strip is the window-drag region, so its stop was unclickable. It now sits just below the title bar and is recorded with the panel — a deliberate trade of a clean frame for a working stop |
+| Foreground can be stolen mid-recording | WorkBuddy came to the front during a test run and the probe showed that app; the loop now samples `GetForegroundWindow` each second and the result carries a warning when focus was lost |
+| A rehearsal is worth more than a static check | `POST /recorder/api/rehearse` runs the same steps through `drive()` without recording; it catches a selector that only exists after the panel switch, which `querySelector` at time zero cannot see |
+| The prompt is the portable form of the spec | `docs/script-spec.md` is the versioned grammar; the panel's copy button emits the same content embedded in a self-contained prompt, so an agent in another repository needs no access to this one |
+| **Panel actions must not depend on poll timers** | the first panel build queued 排练/录制 as a `/poll` job. With the Harness window in the background Chromium throttles the page's timers, so the job sat in the queue (or `waitForClient` timed out) and the button showed 排练中… with nothing happening. `health.clientConnected` was `false` while the window was backgrounded, then `true` again after an external `/poll` — a throttled/transient client, not a crashed one. The panel now runs the steps directly (`POST /start` → local `runSteps` → `POST /stop`); only the agent tools still use the job bridge |
+| The pill's stop must reach the local driver | a panel run executes `runSteps` in the module, outside React; the overlay's stop button sets `control.stopRequested` so a manual stop ends the walk between steps instead of letting it run to the end |
+| **A background window freezes the walk, including stop** | the steps await `setTimeout`; when the window is not foreground/visible Chromium throttles those timers, so a rehearsal appears to do nothing and a stop flag is not observed until a timer fires. Evidence: a stalled rehearsal ended immediately once the window was brought forward. The rehearsal now calls `POST /focus` (py `--focus`: minimize+restore) before running, and the stop signal is written both to a shared control object and to `document.documentElement.dataset`, so a run started by an earlier module instance can also be stopped. Keep the Harness window visible for the whole walk |
+| `ctx.get('layout')` can be null at apply time | after an app restart the client applied before the layout service was up, so `openPanel` threw "the page does not expose ctx.layout.selectPanel". Declaring `layout` in the client `inject` list and resolving it lazily (`runtime.ctx.get('layout')`) fixes ordering and timing |
+| Rehearsal needs a stop surface of its own | the panel's stop used to be disabled unless a recording was running, and the panel is often unmounted by the script itself. There is now a floating rehearsal pill (step counter + stop) independent of the panel, plus the panel's stop enabled while rehearsing |
+| **The top strip is a window-drag region** | the floating pill sat inside the app's custom title bar, where mouse input is treated as a window drag: a real click on 停止 never reached the button (verified with a real `mouse_event` click at the button's pixel position). The pill was moved **below the title bar** (`top: 46px`); a real click at the button now stops the recording. `-webkit-app-region: no-drag` alone was not enough in that strip |
+| Escape is not a dependable stop | the app consumes Escape somewhere before a document-level listener (a real key press with the window foreground did not stop the recording). The listener is left as a best-effort fallback, but the pill button and the panel's 停止 are the controls to rely on |
+| A stop that takes 15 s looks like a dead button | splicing a 26 s / 211-frame recording into a GIF takes a while; the pill used to stay on screen with the clock during assembly. It now disappears the moment 停止 is pressed and a toast says the GIF is being built |
+
+## Window geometry
+
+| Fact | Value / behaviour |
+| --- | --- |
+| The app window must fill the current screen | `--fill-screen` moves the window to the **cursor's** monitor (its work area) and maximizes it (Win32 `MonitorFromPoint` + `SetWindowPos` + `SW_MAXIMIZE`); the Host calls it shortly after activation when `maximizeOnStart` is true, and the panel exposes 铺满屏幕 |
+| **Focus must not change the window's size** | `activate()` called `ShowWindow(SW_RESTORE)` unconditionally. On Windows that returns a **maximized** window to its normal size and remembered position — so starting a rehearsal (which calls `POST /focus`) un-maximized and moved a perfectly fullscreen app. It now restores only when minimized, and the minimize-then-foreground fallback re-maximizes if the window was maximized. Verified: after `/focus` and after a whole rehearsal, `IsZoomed` stays true and the rect is unchanged |
+| "Fill the screen" is not the same as "no scaling" | window geometry is ours; the UI scale follows the monitor's DPI (the primary here is 120 DPI = 125%, the secondary 96 DPI = 100%). A page plugin cannot change the process's DPI mode — that needs the monitor set to 100%, or the app launched with Chromium's `--force-device-scale-factor=1` |
+
+
+

@@ -1,0 +1,17 @@
+[
+  { "op": "openPanel", "panel": "notes" },
+  { "op": "wait", "selector": ".dshn-root", "timeoutMs": 8000 },
+  { "op": "click", "selector": ".dshn-switch[aria-checked=\"true\"]" },
+  { "op": "click", "selector": ".dshn-tabs button.dshn-tab:nth-of-type(1)" },
+  { "op": "setValue", "selector": ".dshn-textarea", "text": "" },
+  { "op": "click", "selector": ".dshn-textarea" },
+  {
+    "op": "type",
+    "selector": ".dshn-textarea",
+    "text": "极简笔记\n\n这不是一个新的工具，而是一个关于文字的哲学思考。\n智能不能成为文字的主角。\n功能应当服务于思想。\n书写带来快乐。",
+    "ms": 45
+  },
+  { "op": "sleep", "ms": 900 },
+  { "op": "select", "selector": ".dshn-textarea", "text": "智能不能成为文字的主角。" },
+  { "op": "sleep", "ms": 1200 }
+]

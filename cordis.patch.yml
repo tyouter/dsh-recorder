@@ -1,0 +1,13 @@
+# The recorder: a Host half (capture + tools) and a browser half (drive + REC overlay).
+# Nothing here touches the plugin being filmed — the driver is the recorder's own client half.
+- insert:
+    - id: dsh-recorder
+      name: '@tyouter/dsh-recorder'
+      config:
+        # Empty: use the Python this Harness ships. Set an absolute path for another interpreter.
+        pythonPath: ''
+        # Empty: recordings land in <session workspace>/recordings.
+        outDir: ''
+        # On start, move the window to the monitor under the cursor and maximize it (fills the
+        # screen, 1:1). Set false to leave the window geometry alone.
+        maximizeOnStart: true

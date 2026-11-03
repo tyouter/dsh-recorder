@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Plugin Recorder",
+    "description": "Drives another plugin's real interface and records it to GIF or stills: typing, clicking, selecting text, with a live REC indicator."
+  }
+}
