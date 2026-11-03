@@ -1,0 +1,4 @@
+# Recordings and frames are build output, not source.
+exports/
+__pycache__/
+*.pyc
