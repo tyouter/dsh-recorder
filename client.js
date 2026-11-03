@@ -28,7 +28,8 @@ window.__ModuleLoader__.load({
       recording: null,
       rehearsal: null,
       toast: null,
-      cursor: { visible: false, x: 0, y: 0, press: 0 },
+      cursor: { visible: false, x: 0, y: 0, press: 0, trail: [] },
+      highlight: null,
     }
     const listeners = new Set()
 
@@ -44,15 +45,43 @@ window.__ModuleLoader__.load({
     }
 
     let hideCursorTimer = null
+    let trailSeq = 0
+    const trailPoints = []
     function moveCursor(x, y) {
       if (hideCursorTimer !== null) {
         clearTimeout(hideCursorTimer)
         hideCursorTimer = null
       }
-      publish({ cursor: { ...store.cursor, visible: true, x: Math.round(x), y: Math.round(y) } })
+      const to = { x: Math.round(x), y: Math.round(y) }
+      const from = store.cursor.visible ? { x: store.cursor.x, y: store.cursor.y } : null
+      if (from !== null && Math.hypot(to.x - from.x, to.y - from.y) > 40) {
+        // Breadcrumbs along the jump, so a single move still reads as movement on camera.
+        for (const t of [0.35, 0.7]) {
+          trailPoints.push({ id: (trailSeq += 1), x: Math.round(from.x + (to.x - from.x) * t), y: Math.round(from.y + (to.y - from.y) * t) })
+        }
+      }
+      trailPoints.push({ id: (trailSeq += 1), ...to })
+      while (trailPoints.length > 8) trailPoints.shift()
+      publish({ cursor: { ...store.cursor, visible: true, x: to.x, y: to.y, trail: trailPoints.slice() } })
     }
     function pressCursor() {
       publish({ cursor: { ...store.cursor, press: store.cursor.press + 1 } })
+    }
+
+    let highlightTimer = null
+    function highlightElement(node) {
+      try {
+        const rect = node.getBoundingClientRect()
+        if (rect.width < 2 || rect.height < 2) return
+        publish({ highlight: { key: Date.now(), rect: [rect.left, rect.top, rect.width, rect.height] } })
+        if (highlightTimer !== null) clearTimeout(highlightTimer)
+        highlightTimer = setTimeout(() => {
+          highlightTimer = null
+          publish({ highlight: null })
+        }, 760)
+      } catch {
+        /* a decorative outline is not worth failing a click over */
+      }
     }
     function scheduleCursorHide(delay = 1400) {
       if (hideCursorTimer !== null) clearTimeout(hideCursorTimer)
@@ -210,6 +239,7 @@ window.__ModuleLoader__.load({
       moveCursor(point.x, point.y)
       await sleep(240)
       pressCursor()
+      highlightElement(node)
       try {
         node.focus?.({ preventScroll: true })
       } catch {
@@ -612,7 +642,7 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------- overlay ---
 
     function useStore() {
-      const snapshotOf = () => ({ recording: store.recording, rehearsal: store.rehearsal, toast: store.toast, cursor: store.cursor })
+      const snapshotOf = () => ({ recording: store.recording, rehearsal: store.rehearsal, toast: store.toast, cursor: store.cursor, highlight: store.highlight })
       const [snapshot, setSnapshot] = useState(snapshotOf)
       useEffect(() => {
         const listener = () => setSnapshot(snapshotOf())
@@ -629,16 +659,18 @@ window.__ModuleLoader__.load({
         { className: 'dshr-cursor', style, 'data-dsh-recorder': '1', 'aria-hidden': 'true' },
         h(
           'svg',
-          { width: 22, height: 22, viewBox: '0 0 24 24' },
+          { width: 26, height: 26, viewBox: '0 0 24 24' },
           h('path', {
             d: 'M4 2.5 20 11l-7.2 1.6L9 20.5z',
             fill: '#ffffff',
             stroke: '#111111',
-            strokeWidth: 1.6,
+            strokeWidth: 1.8,
             strokeLinejoin: 'round',
           }),
         ),
-        h('span', { key: cursor.press, className: 'dshr-ping' }),
+        h('span', { key: `a${cursor.press}`, className: 'dshr-ping' }),
+        h('span', { key: `b${cursor.press}`, className: 'dshr-ping dshr-ping-late' }),
+        h('span', { key: `c${cursor.press}`, className: 'dshr-flash' }),
       )
     }
 
@@ -729,6 +761,31 @@ window.__ModuleLoader__.load({
                 ),
               )
             : null,
+        snapshot.cursor.visible && Array.isArray(snapshot.cursor.trail)
+          ? snapshot.cursor.trail.slice(0, -1).map((point) =>
+              h('span', {
+                key: point.id,
+                className: 'dshr-trail',
+                style: { transform: `translate3d(${point.x}px, ${point.y}px, 0)` },
+                'data-dsh-recorder': '1',
+                'aria-hidden': 'true',
+              }),
+            )
+          : null,
+        snapshot.highlight !== null
+          ? h('div', {
+              key: snapshot.highlight.key,
+              className: 'dshr-highlight',
+              style: {
+                left: `${snapshot.highlight.rect[0]}px`,
+                top: `${snapshot.highlight.rect[1]}px`,
+                width: `${snapshot.highlight.rect[2]}px`,
+                height: `${snapshot.highlight.rect[3]}px`,
+              },
+              'data-dsh-recorder': '1',
+              'aria-hidden': 'true',
+            })
+          : null,
         snapshot.cursor.visible ? h(Cursor, { cursor: snapshot.cursor }) : null,
         snapshot.toast !== null
           ? h('div', { className: 'dshr-toast', 'data-dsh-recorder': '1', role: 'status' }, snapshot.toast)
@@ -1417,12 +1474,30 @@ sleep 1200`
 .dshr-stop:disabled { opacity: .55; cursor: default; }
 .dshr-cursor {
   position: fixed; left: 0; top: 0; z-index: 2147483001; pointer-events: none;
-  transition: transform 220ms cubic-bezier(.2,.8,.2,1); will-change: transform;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,.45)); margin: -2px 0 0 -2px;
+  transition: transform 260ms cubic-bezier(.2,.8,.2,1); will-change: transform;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.5)); margin: -3px 0 0 -3px;
+}
+.dshr-trail {
+  position: fixed; left: 0; top: 0; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%; background: #4d6bfe; pointer-events: none;
+  z-index: 2147482999; animation: dshr-trail 560ms ease-out forwards;
 }
 .dshr-ping {
-  position: absolute; left: -6px; top: -6px; width: 26px; height: 26px; border-radius: 50%;
-  border: 2px solid var(--dsw-alias-brand-primary, #4d6bfe); opacity: 0; animation: dshr-ping .45s ease-out 1;
+  position: absolute; left: -22px; top: -22px; width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid #4d6bfe; opacity: 0;
+  animation: dshr-ping 620ms ease-out forwards;
+}
+.dshr-ping-late { animation-delay: 95ms; }
+.dshr-flash {
+  position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+  background: #4d6bfe; opacity: 0;
+  animation: dshr-flash 460ms ease-out forwards;
+}
+.dshr-highlight {
+  position: fixed; z-index: 2147482998; pointer-events: none;
+  border: 2px solid #4d6bfe; border-radius: 8px;
+  background: rgba(77,107,254,.14); background: color-mix(in srgb, #4d6bfe 14%, transparent);
+  animation: dshr-highlight 760ms ease-out forwards;
 }
 .dshr-toast {
   position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 2147483002; max-width: 70vw;
@@ -1479,9 +1554,12 @@ sleep 1200`
 .dshr-recent-name { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dshr-recent-meta { font-size: 11px; color: var(--dsw-alias-label-secondary); }
 @keyframes dshr-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.82); } }
-@keyframes dshr-ping { from { opacity: .9; transform: scale(.4); } to { opacity: 0; transform: scale(1.25); } }
+@keyframes dshr-ping { from { opacity: .95; transform: scale(.25); } to { opacity: 0; transform: scale(1.6); } }
+@keyframes dshr-flash { 0% { opacity: .95; transform: scale(.6); } 100% { opacity: 0; transform: scale(2.4); } }
+@keyframes dshr-trail { from { opacity: .55; } to { opacity: 0; } }
+@keyframes dshr-highlight { 0% { opacity: .95; } 55% { opacity: .75; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .dshr-dot, .dshr-ping { animation: none; }
+  .dshr-dot, .dshr-ping, .dshr-flash, .dshr-trail, .dshr-highlight { animation: none; }
   .dshr-cursor { transition: none; }
 }
 `

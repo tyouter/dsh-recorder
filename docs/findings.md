@@ -140,6 +140,7 @@ Everything below was observed while turning the prototype into `@tyouter/dsh-rec
 | **The top strip is a window-drag region** | the floating pill sat inside the app's custom title bar, where mouse input is treated as a window drag: a real click on 停止 never reached the button (verified with a real `mouse_event` click at the button's pixel position). The pill was moved **below the title bar** (`top: 46px`); a real click at the button now stops the recording. `-webkit-app-region: no-drag` alone was not enough in that strip |
 | Escape is not a dependable stop | the app consumes Escape somewhere before a document-level listener (a real key press with the window foreground did not stop the recording). The listener is left as a best-effort fallback, but the pill button and the panel's 停止 are the controls to rely on |
 | A stop that takes 15 s looks like a dead button | splicing a 26 s / 211-frame recording into a GIF takes a while; the pill used to stay on screen with the clock during assembly. It now disappears the moment 停止 is pressed and a toast says the GIF is being built |
+| Click feedback is an in-page overlay | the pointer, motion breadcrumbs, double ring and element outline are DOM elements, so they are captured with the page and need no post-processing. The theme's brand colour is near-black here, so the effects use a fixed blue (`#4d6bfe`) instead of `--dsw-alias-brand-primary` or they would vanish into text and borders; the overlay's element outline is what makes a small click still readable at 900 px |
 
 ## Window geometry
 

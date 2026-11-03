@@ -58,6 +58,21 @@ Keep the Harness window visible while a walk runs: Chromium throttles a backgrou
 which freezes every `sleep`/`wait` in the script (and delays a stop). The rehearsal brings the window
 forward before it starts; the capture does the same by design.
 
+### Cursor and click effects
+
+The driver paints the pointer into the page, so the effects are part of the recording — no
+post-processing, the frames are the page:
+
+- a short blue trail follows a move, including a jump across the screen (two breadcrumbs are laid on
+  the straight line when the distance is large);
+- **two expanding blue rings plus a flash** mark the click;
+- the clicked element gets a **temporary blue outline**, so the target is obvious even when the
+  pointer is small.
+
+![Click effect](docs/click-effect.png)
+
+All of it is disabled under `prefers-reduced-motion` (the outline and the pointer are still drawn).
+
 ### Recording area
 
 `功能区` is the default and is what most demos want: the page measures the main panel's box and sends
@@ -200,6 +215,7 @@ examples/notes-demo.json  the verified walk as JSON steps
 docs/panel.png          the recorder page
 docs/panel-running.png  the page during a run (REC pill + step counter)
 docs/crop-example.png   a 功能区-mode frame (no sidebar, no title bar)
+docs/click-effect.png   the pointer, trail and double click ring over a clicked tab
 docs/script-spec.md     the versioned script grammar (also the source of the copied prompt)
 HANDOFF.md             the original brief (kept as the design record)
 docs/findings.md       measurements: what was proved, what failed, and why
