@@ -993,7 +993,7 @@ sleep 1200`
       )
     }
 
-    function resultCard(result, onCopy) {
+    function resultCard(result, onCopy, title = '录制结果') {
       const log = Array.isArray(result?.walk?.log) ? result.walk.log : []
       return h(
         'section',
@@ -1001,7 +1001,7 @@ sleep 1200`
         h(
           'div',
           { className: 'dshr-card-head' },
-          h('span', { className: 'dshr-card-title' }, '录制结果'),
+          h('span', { className: 'dshr-card-title' }, title),
           h('button', { className: 'dshr-link', type: 'button', onClick: onCopy }, '复制路径'),
         ),
         h('img', { className: 'dshr-shot', src: assetUrl(result?.gif), alt: 'recording' }),
@@ -1055,34 +1055,37 @@ sleep 1200`
       )
     }
 
-    function recentList(items, onOpen) {
+    function GearIcon() {
       return h(
-        'section',
-        { className: 'dshr-card' },
-        h('div', { className: 'dshr-card-head' }, h('span', { className: 'dshr-card-title' }, '最近录制')),
-        h(
-          'div',
-          { className: 'dshr-recent' },
-          ...items.map((item) =>
-            h(
-              'button',
-              { key: item.name, className: 'dshr-recent-item', type: 'button', onClick: () => onOpen(item), title: item.gif },
-              item.probe !== null && item.probe !== undefined
-                ? h('img', { className: 'dshr-thumb', src: assetUrl(item.probe), alt: item.name })
-                : h('span', { className: 'dshr-thumb' }),
-              h(
-                'span',
-                { className: 'dshr-recent-text' },
-                h('span', { className: 'dshr-recent-name' }, item.name),
-                h('span', { className: 'dshr-recent-meta' }, `${item.seconds ?? '?'}s · ${item.frames ?? '?'} 帧`),
-              ),
-            ),
-          ),
-        ),
+        'svg',
+        { width: 17, height: 17, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
+        h('circle', { cx: 12, cy: 12, r: 3 }),
+        h('path', {
+          d: 'M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.08a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.08a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.08a1.7 1.7 0 0 0-1.56 1.03z',
+        }),
+      )
+    }
+
+    function emptyCard(title, note) {
+      return h('section', { className: 'dshr-card dshr-empty' }, h('div', { className: 'dshr-empty-title' }, title), h('div', { className: 'dshr-empty-note' }, note))
+    }
+
+    function historyCard(item, onOpen) {
+      return h(
+        'button',
+        { key: item.name, className: 'dshr-history-card', type: 'button', onClick: onOpen, title: item.gif },
+        item.probe !== null && item.probe !== undefined
+          ? h('img', { className: 'dshr-history-thumb', src: assetUrl(item.probe), alt: item.name })
+          : h('span', { className: 'dshr-history-thumb' }),
+        h('span', { className: 'dshr-history-name' }, item.name),
+        h('span', { className: 'dshr-history-meta' }, `${item.seconds ?? '?'}s · ${item.frames ?? '?'} 帧 · ${Math.round((Number(item.bytes) || 0) / 1024)} KB`),
       )
     }
 
     function RecorderPanel() {
+      const [tab, setTab] = useState('record')
+      const [settingsOpen, setSettingsOpen] = useState(false)
+      const [historyPick, setHistoryPick] = useState(null)
       const [script, setScript] = useState(readDraft)
       const [fps, setFps] = useState(6)
       const [width, setWidth] = useState(1000)
@@ -1143,7 +1146,7 @@ sleep 1200`
       const refreshRecent = async (root = workspace) => {
         try {
           const query = root === '' ? '' : `&workspace=${encodeURIComponent(root)}`
-          const payload = await getJson(`${API}/recordings?limit=8${query}`)
+          const payload = await getJson(`${API}/recordings?limit=24${query}`)
           const list = Array.isArray(payload?.data?.recordings) ? payload.data.recordings : []
           setRecent(list)
           return list
@@ -1160,6 +1163,10 @@ sleep 1200`
           if (latest) setResult((current) => current ?? latest)
         })()
       }, [])
+
+      useEffect(() => {
+        if (tab === 'history') void refreshRecent(workspace)
+      }, [tab])
 
       const updateScript = (value) => {
         setScript(value)
@@ -1196,6 +1203,7 @@ sleep 1200`
         setResult(null)
         setBusy(true)
         setLocalProgress(null)
+        setTab('record')
         let started = false
         let finished = false
         try {
@@ -1262,7 +1270,13 @@ sleep 1200`
         toast(ok ? '已复制给插件 agent 的 prompt' : '复制失败，请手动选择文本框内容')
       }
 
+      const copyPath = async (path) => {
+        const ok = await copyText(String(path ?? ''))
+        toast(ok ? '路径已复制' : '复制失败')
+      }
+
       const fillScreen = async () => {
+        setSettingsOpen(false)
         try {
           const payload = await postJson(`${API}/fill`, { title: 'DeepSeek Harness' })
           toast(payload?.ok ? '已铺满当前屏幕' : '铺满失败：找不到窗口')
@@ -1317,127 +1331,179 @@ sleep 1200`
             : '准备中…'
           : '就绪'
 
-      return h(
-        'div',
-        { className: 'dshr-page' },
-        h(Styles, null),
+      const tabButton = (id, label, count) =>
         h(
-          'header',
-          { className: 'dshr-page-head' },
-          h(
-            'div',
-            null,
-            h('h1', { className: 'dshr-h1' }, '录制器'),
-            h('p', { className: 'dshr-sub' }, '写一段脚本，它会在页面里像人一样执行，同时把真实窗口录成 GIF。'),
-          ),
+          'button',
+          { className: 'dshr-tab', type: 'button', 'data-active': String(tab === id), onClick: () => setTab(id) },
+          label,
+          count ? h('span', { className: 'dshr-tab-count' }, String(count)) : null,
+        )
+
+      const header = h(
+        'header',
+        { className: 'dshr-head' },
+        h(
+          'div',
+          { className: 'dshr-title-block' },
+          h('h1', { className: 'dshr-h1' }, '录制器'),
+          h('p', { className: 'dshr-sub' }, '写一段脚本，它会在页面里像真人一样执行，同时把真实窗口录成 GIF。'),
+        ),
+        h(
+          'div',
+          { className: 'dshr-head-right' },
           h(
             'div',
             { className: 'dshr-head-status' + (running || busy || rehearsing ? ' is-running' : '') },
             h('span', { className: 'dshr-status-dot' }),
             h('span', null, statusText),
           ),
+          h(
+            'button',
+            { className: 'dshr-icon-btn', type: 'button', title: '设置', 'aria-label': '设置', 'aria-expanded': String(settingsOpen), onClick: () => setSettingsOpen((value) => !value) },
+            h(GearIcon),
+          ),
         ),
+      )
+
+      const tabs = h('div', { className: 'dshr-tabs-bar' }, tabButton('record', '录制'), tabButton('history', '历史', recent.length))
+
+      const scriptCard = h(
+        'section',
+        { className: 'dshr-card dshr-script-card' },
         h(
-          'section',
-          { className: 'dshr-card' },
+          'div',
+          { className: 'dshr-card-head' },
+          h('span', { className: 'dshr-card-title' }, '录制脚本'),
           h(
             'div',
-            { className: 'dshr-card-head' },
-            h('span', { className: 'dshr-card-title' }, '录制脚本'),
-            h(
-              'div',
-              { className: 'dshr-head-actions' },
-              h('button', { className: 'dshr-link', type: 'button', onClick: () => void fillScreen() }, '铺满屏幕'),
-              h('button', { className: 'dshr-link', type: 'button', onClick: () => void copyPrompt() }, '复制给插件 agent 的 prompt'),
-              h('button', { className: 'dshr-link', type: 'button', onClick: () => updateScript(SAMPLE_SCRIPT) }, '载入示例'),
-            ),
+            { className: 'dshr-card-head-actions' },
+            h('button', { className: 'dshr-link', type: 'button', onClick: () => void copyPrompt() }, '复制给插件 agent 的 prompt'),
+            h('button', { className: 'dshr-link', type: 'button', onClick: () => updateScript(SAMPLE_SCRIPT) }, '载入示例'),
           ),
-          h('textarea', {
-            className: 'dshr-script',
-            value: script,
-            spellCheck: false,
-            onChange: (event) => updateScript(event.target.value),
-            placeholder: 'open notes\nwait .dshn-root\ntype .dshn-textarea | 写点什么',
-            'aria-label': '录制脚本',
-          }),
-          h('p', { className: 'dshr-hint' }, '每行一步：open / click / type / set / select / wait / sleep / key / scroll / focus。文字里用 \\n 换行；也可以直接粘贴 JSON 步骤数组。'),
         ),
-        workspaces.length > 0
-          ? h(
-              'label',
-              { className: 'dshr-field' },
-              h('span', { className: 'dshr-label' }, '输出工作区'),
-              h(
-                'select',
-                {
-                  className: 'dshr-input',
-                  value: workspace,
-                  onChange: (event) => chooseWorkspace(event.target.value),
-                  'aria-label': '输出工作区',
-                },
-                ...workspaces.map((item) => h('option', { key: item.path, value: item.path, title: item.path }, `${item.title} — ${item.path}`)),
-              ),
-            )
-          : null,
+        h('textarea', {
+          className: 'dshr-script',
+          value: script,
+          spellCheck: false,
+          onChange: (event) => updateScript(event.target.value),
+          placeholder: 'open notes\nwait .dshn-root\ntype .dshn-textarea | 写点什么',
+          'aria-label': '录制脚本',
+        }),
+        h('p', { className: 'dshr-hint' }, '每行一步：open / click / type / set / select / wait / sleep / key / scroll / focus。文字里用 \\n 换行；也可以直接粘贴 JSON 步骤数组。'),
+      )
+
+      const home = h(
+        'div',
+        { className: 'dshr-home' },
+        scriptCard,
         h(
-          'label',
-          { className: 'dshr-field' },
-          h('span', { className: 'dshr-label' }, '录制区域'),
+          'div',
+          { className: 'dshr-record-row' },
           h(
-            'select',
-            {
-              className: 'dshr-input',
-              value: cropMode,
-              onChange: (event) => chooseCrop(event.target.value, cropSelector),
-              'aria-label': '录制区域',
-            },
-            h('option', { value: 'content' }, '功能区（自动去掉侧边栏）'),
-            h('option', { value: 'window' }, '整个窗口'),
-            h('option', { value: 'custom' }, '自定义区域（CSS 选择器）'),
+            'button',
+            { className: 'dshr-record', type: 'button', disabled: busy || running || rehearsing, onClick: () => void start() },
+            h('span', { className: 'dshr-record-dot' }),
+            busy ? '录制中…' : '开始录制',
           ),
-        ),
-        cropMode === 'custom'
-          ? h(
-              'label',
-              { className: 'dshr-field' },
-              h('span', { className: 'dshr-label' }, '区域选择器'),
-              h('input', {
-                className: 'dshr-input',
-                value: cropSelector,
-                placeholder: '.dshr-page',
-                onChange: (event) => chooseCrop('custom', event.target.value),
-                'aria-label': '区域选择器',
-              }),
-            )
-          : null,
-        h(
-          'div',
-          { className: 'dshr-options' },
-          optionField('帧率', h('input', { className: 'dshr-input', value: fps, inputMode: 'decimal', onChange: (event) => setFps(event.target.value), 'aria-label': '帧率' })),
-          optionField('GIF 宽度', h('input', { className: 'dshr-input', value: width, inputMode: 'numeric', onChange: (event) => setWidth(event.target.value), 'aria-label': 'GIF 宽度' })),
-          optionField('截图时间点（秒）', h('input', { className: 'dshr-input', value: stills, onChange: (event) => setStills(event.target.value), 'aria-label': '截图时间点' })),
-        ),
-        error !== '' ? h('div', { className: 'dshr-error' }, error) : null,
-        h(
-          'div',
-          { className: 'dshr-actions' },
-          h('button', { className: 'dshr-primary', type: 'button', disabled: busy || running || rehearsing, onClick: () => void start() }, busy ? '录制中…' : '开始录制'),
           h('button', { className: 'dshr-secondary', type: 'button', disabled: busy || running || rehearsing, onClick: () => void rehearse() }, rehearsing ? '排练中…' : '排练（不录制）'),
-          h('button', { className: 'dshr-secondary', type: 'button', disabled: !running && !rehearsing && !busy, onClick: () => void stop() }, isStopRequested() ? '停止中…' : '停止'),
-          h('span', { className: 'dshr-note' }, '录制会抬起并最大化窗口，结束后恢复。'),
+          running || rehearsing || busy
+            ? h('button', { className: 'dshr-secondary', type: 'button', onClick: () => void stop() }, isStopRequested() ? '停止中…' : '停止')
+            : null,
         ),
+        h('p', { className: 'dshr-note-line' }, '窗口会抬到前台并最大化，结束后恢复；光标、点击圆环和目标描边都会录进 GIF。'),
+        error !== '' ? h('div', { className: 'dshr-error' }, error) : null,
         rehearsal !== null ? rehearsalCard(rehearsal) : null,
         result !== null
-          ? resultCard(result, () => {
-              try {
-                void navigator.clipboard?.writeText(String(result.gif ?? ''))
-                toast('路径已复制')
-              } catch {
-                /* clipboard may be blocked */
-              }
-            })
-          : null,
-        recent.length > 0 ? recentList(recent, (item) => setResult(item)) : null,
+          ? resultCard(result, () => void copyPath(result.gif), '本次录制')
+          : emptyCard('还没有录制结果', '写好脚本，按「开始录制」，结果会显示在这里。'),
+      )
+
+      const history = h(
+        'div',
+        { className: 'dshr-home' },
+        historyPick !== null
+          ? h(
+              React.Fragment,
+              null,
+              h('button', { className: 'dshr-link dshr-back', type: 'button', onClick: () => setHistoryPick(null) }, '← 返回历史列表'),
+              resultCard(historyPick, () => void copyPath(historyPick.gif), '历史录制'),
+            )
+          : recent.length === 0
+            ? emptyCard('还没有录制', '录制一次之后，历史记录会出现在这里。')
+            : h('div', { className: 'dshr-history-grid' }, ...recent.map((item) => historyCard(item, () => setHistoryPick(item)))),
+      )
+
+      const settings = settingsOpen
+        ? h(
+            React.Fragment,
+            null,
+            h('div', { className: 'dshr-backdrop', onClick: () => setSettingsOpen(false) }),
+            h(
+              'aside',
+              { className: 'dshr-settings', role: 'dialog', 'aria-label': '设置' },
+              h(
+                'div',
+                { className: 'dshr-settings-head' },
+                h('span', { className: 'dshr-card-title' }, '设置'),
+                h('button', { className: 'dshr-icon-btn', type: 'button', onClick: () => setSettingsOpen(false), 'aria-label': '关闭设置' }, '✕'),
+              ),
+              h(
+                'div',
+                { className: 'dshr-settings-body' },
+                workspaces.length > 0
+                  ? optionField(
+                      '输出工作区',
+                      h(
+                        'select',
+                        { className: 'dshr-input', value: workspace, onChange: (event) => chooseWorkspace(event.target.value), 'aria-label': '输出工作区' },
+                        ...workspaces.map((item) => h('option', { key: item.path, value: item.path, title: item.path }, `${item.title} — ${item.path}`)),
+                      ),
+                    )
+                  : null,
+                optionField(
+                  '录制区域',
+                  h(
+                    'select',
+                    { className: 'dshr-input', value: cropMode, onChange: (event) => chooseCrop(event.target.value, cropSelector), 'aria-label': '录制区域' },
+                    h('option', { value: 'content' }, '功能区（自动去掉侧边栏）'),
+                    h('option', { value: 'window' }, '整个窗口'),
+                    h('option', { value: 'custom' }, '自定义区域（CSS 选择器）'),
+                  ),
+                ),
+                cropMode === 'custom'
+                  ? optionField(
+                      '区域选择器',
+                      h('input', {
+                        className: 'dshr-input',
+                        value: cropSelector,
+                        placeholder: '.dshr-page',
+                        onChange: (event) => chooseCrop('custom', event.target.value),
+                        'aria-label': '区域选择器',
+                      }),
+                    )
+                  : null,
+                h(
+                  'div',
+                  { className: 'dshr-settings-grid' },
+                  optionField('帧率', h('input', { className: 'dshr-input', value: fps, inputMode: 'decimal', onChange: (event) => setFps(event.target.value), 'aria-label': '帧率' })),
+                  optionField('GIF 宽度', h('input', { className: 'dshr-input', value: width, inputMode: 'numeric', onChange: (event) => setWidth(event.target.value), 'aria-label': 'GIF 宽度' })),
+                  optionField('截图时间点（秒）', h('input', { className: 'dshr-input', value: stills, onChange: (event) => setStills(event.target.value), 'aria-label': '截图时间点' })),
+                ),
+                h('button', { className: 'dshr-secondary dshr-wide', type: 'button', onClick: () => void fillScreen() }, '铺满当前屏幕'),
+                h('p', { className: 'dshr-hint dshr-settings-note' }, '设置自动保存在本地，作用于下一次录制。'),
+              ),
+            ),
+          )
+        : null
+
+      return h(
+        'div',
+        { className: 'dshr-page' },
+        h(Styles, null),
+        header,
+        tabs,
+        tab === 'record' ? home : history,
+        settings,
       )
     }
 
@@ -1506,7 +1572,43 @@ sleep 1200`
   box-shadow: 0 10px 30px rgba(0,0,0,.3); font: 500 12.5px/1.45 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none;
 }
-.dshr-page { height: 100%; overflow: auto; padding: 26px 32px 40px; display: flex; flex-direction: column; gap: 14px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
+.dshr-page { position: relative; height: 100%; overflow: auto; padding: 22px 30px 44px; color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); }
+.dshr-head { max-width: 980px; margin: 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.dshr-title-block { min-width: 0; }
+.dshr-head-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.dshr-tabs-bar { max-width: 980px; margin: 14px auto 0; display: flex; gap: 22px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.dshr-tab { position: relative; border: 0; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 13px; padding: 8px 2px 9px; cursor: pointer; }
+.dshr-tab:hover { color: var(--dsw-alias-label-primary); }
+.dshr-tab[data-active="true"] { color: var(--dsw-alias-label-primary); font-weight: 600; }
+.dshr-tab[data-active="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--dsw-alias-label-primary); }
+.dshr-tab-count { margin-left: 6px; font-size: 11px; font-weight: 400; color: var(--dsw-alias-label-secondary); }
+.dshr-home { max-width: 980px; margin: 16px auto 0; display: flex; flex-direction: column; gap: 14px; }
+.dshr-icon-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: transparent; color: var(--dsw-alias-label-secondary); cursor: pointer; }
+.dshr-icon-btn:hover { color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-layer-2); }
+.dshr-record-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.dshr-record-row .dshr-secondary { height: 40px; padding: 0 18px; }
+.dshr-record { display: inline-flex; align-items: center; gap: 9px; height: 46px; padding: 0 30px; border: 0; border-radius: 12px; background: var(--dsw-alias-label-primary); color: var(--dsw-alias-bg-base); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.12); }
+.dshr-record:hover:not(:disabled) { filter: brightness(1.08); }
+.dshr-record:disabled { opacity: .55; cursor: default; box-shadow: none; }
+.dshr-record-dot { width: 10px; height: 10px; border-radius: 50%; background: #e5484d; flex: none; }
+.dshr-note-line { margin: 0; text-align: center; font-size: 11.5px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
+.dshr-backdrop { position: fixed; inset: 0; z-index: 50; background: transparent; }
+.dshr-settings { position: fixed; top: 56px; right: 30px; z-index: 51; width: 380px; max-height: calc(100% - 90px); overflow: auto; background: var(--dsw-alias-bg-overlay); border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.2); }
+.dshr-settings-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
+.dshr-settings-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.dshr-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.dshr-settings-note { padding: 0; margin: 0; }
+.dshr-wide { width: 100%; box-sizing: border-box; }
+.dshr-empty { padding: 40px 20px; text-align: center; }
+.dshr-empty-title { font-size: 14px; font-weight: 600; }
+.dshr-empty-note { margin-top: 6px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
+.dshr-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.dshr-history-card { display: flex; flex-direction: column; padding: 0; border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); overflow: hidden; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+.dshr-history-card:hover { border-color: var(--dsw-alias-border-l2); box-shadow: 0 8px 22px rgba(0,0,0,.08); }
+.dshr-history-thumb { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsw-alias-bg-base); }
+.dshr-history-name { padding: 10px 12px 0; font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dshr-history-meta { padding: 4px 12px 12px; font-size: 11.5px; color: var(--dsw-alias-label-secondary); }
+.dshr-back { align-self: flex-start; }
 .dshr-page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .dshr-h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
 .dshr-sub { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
@@ -1517,13 +1619,14 @@ sleep 1200`
 .dshr-card { border: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-layer-1); border-radius: 12px; overflow: hidden; }
 .dshr-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .dshr-head-actions { display: flex; align-items: center; gap: 12px; }
+.dshr-card-head-actions { display: flex; align-items: center; gap: 12px; }
 .dshr-log { margin: 0; padding: 12px 14px 12px 30px; font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-secondary); }
 .dshr-log li.good { color: var(--dsw-alias-state-success-primary); }
 .dshr-log li.bad { color: var(--dsw-alias-state-error-primary); }
 .dshr-card-title { font-size: 12.5px; font-weight: 600; }
 .dshr-link { border: 0; background: transparent; color: var(--dsw-alias-brand-primary); font: inherit; font-size: 12px; cursor: pointer; padding: 2px 4px; border-radius: 6px; }
 .dshr-link:hover { text-decoration: underline; }
-.dshr-script { display: block; width: 100%; box-sizing: border-box; min-height: 280px; max-height: 46vh; resize: vertical; border: 0; outline: none; background: transparent; color: var(--dsw-alias-label-primary); padding: 14px 16px; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; tab-size: 2; }
+.dshr-script { display: block; width: 100%; box-sizing: border-box; min-height: 320px; max-height: 46vh; resize: vertical; border: 0; outline: none; background: transparent; color: var(--dsw-alias-label-primary); padding: 14px 16px; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; tab-size: 2; }
 .dshr-hint { margin: 0; padding: 0 16px 12px; font-size: 11.5px; line-height: 1.55; color: var(--dsw-alias-label-secondary); }
 .dshr-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .dshr-field { display: flex; flex-direction: column; gap: 5px; }

@@ -18,19 +18,31 @@ Two ways to use it:
 
 ![Recorder panel](docs/panel.png)
 
-Sidebar → 「录制器」 opens a page with:
+Sidebar → 「录制器」 opens a page with two tabs.
+
+**录制** — the whole workflow is one centred column:
 
 | Part | What it does |
 | --- | --- |
-| 录制脚本 | The script. JSON steps or one step per line (see below). Kept in `localStorage` between visits. |
-| 复制给插件 agent 的 prompt | One click copies a self-contained prompt (the full spec + what to output). Paste it into the agent that owns the plugin, describe the demo, and it returns a script you paste back. |
-| 载入示例 | Restores the notes walk that the verified GIF came from. |
-| 输出工作区 | Which registered workspace's `recordings/` receives the output. Defaults to the workspace of a live session; your choice is remembered. |
-| 录制区域 | `功能区` crops to the main panel area (no sidebar, no app title bar), `整个窗口` keeps everything, `自定义区域` crops to any element you name with a CSS selector. |
-| 帧率 / GIF 宽度 / 截图时间点 | 6 fps and 900–1000 px are good defaults; stills are seconds into the recording, comma separated. |
-| 开始录制 / 排练（不录制）/ 停止 | Starts the whole run; `排练` executes the same steps without recording and lists each step's result (real clicks, no video); `停止` ends early. A rehearsal brings the window forward first — a background window throttles the page's timers and would freeze the walk. |
-| 录制结果 | The resulting GIF inline, its path, a copy-path button, and the per-step results. |
-| 最近录制 | The last eight recordings of the selected workspace, each clickable. |
+| 录制脚本 | The script, front and centre. JSON steps or one step per line (see below); kept in `localStorage` between visits. |
+| 复制给插件 agent 的 prompt | One click copies a self-contained prompt (the full spec + what to output). Paste it into the agent that owns the plugin, describe the demo, and it returns a script you paste back. `载入示例` restores the notes walk that the verified GIF came from. |
+| 开始录制 | The primary action, a large button under the editor. `排练（不录制）` runs the same steps without recording (real clicks, no video); `停止` ends early. A rehearsal brings the window forward first — a background window throttles the page's timers and would freeze the walk. |
+| 本次录制 | The result of this run: the GIF inline, its length/frames/size, the path, and the per-step log. |
+
+**⚙ 设置** (top right) opens a popover with the parameters — they are no longer mixed into the main
+page:
+
+- 输出工作区 — which registered workspace's `recordings/` receives the output.
+- 录制区域 — `功能区` (crop to the main panel), `整个窗口`, `自定义区域` + a CSS selector.
+- 帧率 / GIF 宽度 / 截图时间点 — 6 fps and 900–1000 px are good defaults; stills are seconds.
+- 铺满当前屏幕 — maximize on the monitor under the cursor.
+
+![Settings](docs/panel-settings.png)
+
+**历史** — a grid of past recordings of the selected workspace (thumbnail, name, length, frames,
+size). Click a card to open it with the GIF, meta, path and copy button.
+
+![History](docs/panel-history.png)
 
 ![Recorder running](docs/panel-running.png)
 
