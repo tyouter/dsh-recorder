@@ -27,7 +27,9 @@ Sidebar → 「录制器」 opens a page with two tabs.
 | 录制脚本 | The script, front and centre. JSON steps or one step per line (see below); kept in `localStorage` between visits. |
 | 复制给插件 agent 的 prompt | One click copies a self-contained prompt (the full spec + what to output). Paste it into the agent that owns the plugin, describe the demo, and it returns a script you paste back. `载入示例` restores the notes walk that the verified GIF came from. |
 | 开始录制 | The primary action, a large button under the editor. `排练（不录制）` runs the same steps without recording (real clicks, no video); `停止` ends early. A rehearsal brings the window forward first — a background window throttles the page's timers and would freeze the walk. |
-| 本次录制 | The result of this run: the GIF inline, its length/frames/size, the path, and the per-step log. |
+| 本次录制 | The result of this run: a large GIF preview (click it for a full-size lightbox), its length/frames/size, the path, and the per-step log. |
+
+![Full-size preview](docs/panel-preview.png)
 
 **⚙ 设置** (top right) opens a popover with the parameters — they are no longer mixed into the main
 page:
@@ -40,7 +42,8 @@ page:
 ![Settings](docs/panel-settings.png)
 
 **历史** — a grid of past recordings of the selected workspace (thumbnail, name, length, frames,
-size). Click a card to open it with the GIF, meta, path and copy button.
+size). Click a card to open it with the GIF, meta, path and copy button. Click the preview (the
+`⤢ 全尺寸` badge) to open the full-size lightbox; click the backdrop or ✕ to close.
 
 ![History](docs/panel-history.png)
 
