@@ -1094,6 +1094,7 @@ sleep 1200`
       const [tab, setTab] = useState('record')
       const [settingsOpen, setSettingsOpen] = useState(false)
       const [historyPick, setHistoryPick] = useState(null)
+      const [deleteArmed, setDeleteArmed] = useState(false)
       const [preview, setPreview] = useState(null)
       const [zoom, setZoom] = useState('actual')
       const [natural, setNatural] = useState({ w: 0, h: 0 })
@@ -1324,6 +1325,38 @@ sleep 1200`
         toast(ok ? '路径已复制' : '复制失败')
       }
 
+      let disarmTimer = null
+      const removeHistory = async (item) => {
+        if (!deleteArmed) {
+          setDeleteArmed(true)
+          if (disarmTimer !== null) clearTimeout(disarmTimer)
+          disarmTimer = setTimeout(() => {
+            disarmTimer = null
+            setDeleteArmed(false)
+          }, 4000)
+          return
+        }
+        setDeleteArmed(false)
+        if (disarmTimer !== null) {
+          clearTimeout(disarmTimer)
+          disarmTimer = null
+        }
+        if (!item?.dir) {
+          toast('找不到这条录制的目录')
+          return
+        }
+        try {
+          const payload = await postJson(`${API}/delete`, { path: item.dir })
+          if (payload?.ok !== true) throw new Error(payload?.error?.message ?? '删除失败')
+          toast('已删除这条录制')
+          if (result?.gif === item.gif) setResult(null)
+          setHistoryPick(null)
+          await refreshRecent(workspace)
+        } catch (problem) {
+          toast(`删除失败：${String(problem?.message ?? problem)}`)
+        }
+      }
+
       const fillScreen = async () => {
         setSettingsOpen(false)
         try {
@@ -1474,12 +1507,25 @@ sleep 1200`
           ? h(
               React.Fragment,
               null,
-              h('button', { className: 'dshr-link dshr-back', type: 'button', onClick: () => setHistoryPick(null) }, '← 返回历史列表'),
+              h('button', { className: 'dshr-link dshr-back', type: 'button', onClick: () => { setHistoryPick(null); setDeleteArmed(false) } }, '← 返回历史列表'),
+              h(
+                'div',
+                { className: 'dshr-history-actions' },
+                h(
+                  'button',
+                  {
+                    className: 'dshr-secondary dshr-danger',
+                    type: 'button',
+                    onClick: () => void removeHistory(historyPick),
+                  },
+                  deleteArmed ? '再点一次确认删除' : '删除这段录制',
+                ),
+              ),
               resultCard(historyPick, () => void copyPath(historyPick.gif), '历史录制', openPreview),
             )
           : recent.length === 0
             ? emptyCard('还没有录制', '录制一次之后，历史记录会出现在这里。')
-            : h('div', { className: 'dshr-history-grid' }, ...recent.map((item) => historyCard(item, () => setHistoryPick(item)))),
+            : h('div', { className: 'dshr-history-grid' }, ...recent.map((item) => historyCard(item, () => { setDeleteArmed(false); setHistoryPick(item) }))),
       )
 
       const settings = settingsOpen
@@ -1695,6 +1741,9 @@ sleep 1200`
 .dshr-empty-title { font-size: 14px; font-weight: 600; }
 .dshr-empty-note { margin-top: 6px; font-size: 12px; color: var(--dsw-alias-label-secondary); }
 .dshr-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.dshr-history-actions { display: flex; justify-content: flex-end; }
+.dshr-danger { color: var(--dsw-alias-state-error-primary); border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent); }
+.dshr-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 8%, transparent); }
 .dshr-history-card { display: flex; flex-direction: column; padding: 0; border: 1px solid var(--dsw-alias-border-l1); border-radius: 12px; background: var(--dsw-alias-bg-layer-1); overflow: hidden; cursor: pointer; text-align: left; color: inherit; font: inherit; }
 .dshr-history-card:hover { border-color: var(--dsw-alias-border-l2); box-shadow: 0 8px 22px rgba(0,0,0,.08); }
 .dshr-history-thumb { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsw-alias-bg-base); }

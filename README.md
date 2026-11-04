@@ -47,6 +47,10 @@ page:
 size). Click a card to open it with the GIF, meta, path and copy button. Click the preview (the
 `⤢ 全尺寸` badge) to open the full-size lightbox; click the backdrop or ✕ to close.
 
+The detail view also has **删除这段录制**: the first click arms the button, the second confirms and
+removes the recording directory from disk. Only directories directly under a recordings root whose
+name matches `rec-YYYYMMDD-HHMMSS` can be deleted (the route refuses anything else).
+
 ![History](docs/panel-history.png)
 
 ![Recorder running](docs/panel-running.png)
