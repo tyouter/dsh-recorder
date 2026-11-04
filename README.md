@@ -59,11 +59,14 @@ While a run is active the status pill counts steps (`录制中 00:01 · 3/3 clic
 pill below the title bar shows the clock and a stop button. A rehearsal gets the same pill in blue
 (`排练 2/10`) with its own stop, so it can be ended even when the script has switched away from this
 page. The panel is in the main area, so a script that opens another plugin's panel will hide it — the
-pill stays visible, and coming back to the recorder panel shows the finished result.
+pill stays available, and coming back to the recorder panel shows the finished result.
 
-The pill sits at `top: 46px` on purpose: the very top strip of the window is its drag region, and a
-click there belongs to the window manager, not to the button. Pressing 停止 hides the pill immediately
-while the GIF is assembled, so a long splice never looks like an ignored click.
+The pill is **hidden while the pointer is away from the top strip** and appears when the pointer enters
+the top 84 px. That keeps it out of the recording (nothing is drawn over the page during a normal
+walk), while moving the mouse to the top is the stop control when the panel is not visible. It sits at
+`top: 46px` because the very top strip is the window's drag region; a click there belongs to the window
+manager. Pressing 停止 hides the pill immediately while the GIF is assembled, so a long splice never
+looks like an ignored click.
 
 ### Window size
 

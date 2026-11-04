@@ -681,6 +681,7 @@ window.__ModuleLoader__.load({
     function RecorderOverlay() {
       const snapshot = useStore()
       const [stopping, setStopping] = useState(false)
+      const [hovered, setHovered] = useState(false)
       const [, setTick] = useState(0)
       const active = snapshot.recording !== null
       useEffect(() => {
@@ -688,6 +689,14 @@ window.__ModuleLoader__.load({
         const timer = setInterval(() => setTick((value) => value + 1), 500)
         return () => clearInterval(timer)
       }, [active])
+
+      // The pill is only shown while the pointer is in the top strip, so it is not in the frames
+      // unless the user deliberately reaches for it. Moving up there brings it back.
+      useEffect(() => {
+        const onMove = (event) => setHovered(event.clientY <= 84)
+        document.addEventListener('mousemove', onMove, true)
+        return () => document.removeEventListener('mousemove', onMove, true)
+      }, [])
 
       const stop = async () => {
         setStopping(true)
@@ -716,26 +725,26 @@ window.__ModuleLoader__.load({
         React.Fragment,
         null,
         h(Styles, null),
-        recording !== null
-          ? h(
-              'div',
-              { className: 'dshr-overlay', 'data-dsh-recorder': '1' },
-              h(
-                'div',
-                { className: 'dshr-pill', role: 'status', 'aria-live': 'polite' },
-                h('span', { className: 'dshr-dot' }),
-                h('span', { className: 'dshr-rec' }, 'REC'),
-                h('span', { className: 'dshr-clock' }, clock),
-                h('span', { className: 'dshr-title' }, String(recording.title ?? 'this window')),
-                h(
-                  'button',
-                  { className: 'dshr-stop', type: 'button', onClick: () => void stop(), disabled: stopping, 'data-dsh-recorder': '1' },
-                  stopping ? '生成中…' : '停止',
-                ),
-              ),
-            )
-          : snapshot.rehearsal !== null
+        (recording !== null || snapshot.rehearsal !== null) && hovered
+          ? recording !== null
             ? h(
+                'div',
+                { className: 'dshr-overlay', 'data-dsh-recorder': '1' },
+                h(
+                  'div',
+                  { className: 'dshr-pill', role: 'status', 'aria-live': 'polite' },
+                  h('span', { className: 'dshr-dot' }),
+                  h('span', { className: 'dshr-rec' }, 'REC'),
+                  h('span', { className: 'dshr-clock' }, clock),
+                  h('span', { className: 'dshr-title' }, String(recording.title ?? 'this window')),
+                  h(
+                    'button',
+                    { className: 'dshr-stop', type: 'button', onClick: () => void stop(), disabled: stopping, 'data-dsh-recorder': '1' },
+                    stopping ? '生成中…' : '停止',
+                  ),
+                ),
+              )
+            : h(
                 'div',
                 { className: 'dshr-overlay', 'data-dsh-recorder': '1' },
                 h(
@@ -760,7 +769,7 @@ window.__ModuleLoader__.load({
                   ),
                 ),
               )
-            : null,
+          : null,
         snapshot.cursor.visible && Array.isArray(snapshot.cursor.trail)
           ? snapshot.cursor.trail.slice(0, -1).map((point) =>
               h('span', {
@@ -1513,7 +1522,7 @@ sleep 1200`
             ? h('button', { className: 'dshr-secondary', type: 'button', onClick: () => void stop() }, isStopRequested() ? '停止中…' : '停止')
             : null,
         ),
-        h('p', { className: 'dshr-note-line' }, '窗口会抬到前台并最大化，结束后恢复；光标、点击圆环和目标描边都会录进 GIF。'),
+        h('p', { className: 'dshr-note-line' }, '窗口会抬到前台并最大化，结束后恢复；光标、点击圆环和目标描边都会录进 GIF。录制中把鼠标移到窗口顶部，会浮出停止按钮（平时不显示，避免入镜）。'),
         error !== '' ? h('div', { className: 'dshr-error' }, error) : null,
         rehearsal !== null ? rehearsalCard(rehearsal) : null,
         result !== null
