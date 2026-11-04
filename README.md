@@ -36,7 +36,9 @@ page:
 
 - 输出工作区 — which registered workspace's `recordings/` receives the output.
 - 录制区域 — `功能区` (crop to the main panel), `整个窗口`, `自定义区域` + a CSS selector.
-- 帧率 / GIF 宽度 / 截图时间点 — 6 fps and 900–1000 px are good defaults; stills are seconds.
+- 帧率 / GIF 宽度 / 截图时间点 — 6 fps. The GIF width defaults to the content's **physical** pixel
+  width (≈1470 on a 125% display) so the preview is never upscaled; lower it to shrink files, and
+  remember the encoder cannot add detail beyond the source. Stills are seconds.
 - 铺满当前屏幕 — maximize on the monitor under the cursor.
 
 ![Settings](docs/panel-settings.png)

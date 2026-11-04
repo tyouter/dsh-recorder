@@ -141,6 +141,8 @@ Everything below was observed while turning the prototype into `@tyouter/dsh-rec
 | Escape is not a dependable stop | the app consumes Escape somewhere before a document-level listener (a real key press with the window foreground did not stop the recording). The listener is left as a best-effort fallback, but the pill button and the panel's 停止 are the controls to rely on |
 | A stop that takes 15 s looks like a dead button | splicing a 26 s / 211-frame recording into a GIF takes a while; the pill used to stay on screen with the clock during assembly. It now disappears the moment 停止 is pressed and a toast says the GIF is being built |
 | Click feedback is an in-page overlay | the pointer, motion breadcrumbs, double ring and element outline are DOM elements, so they are captured with the page and need no post-processing. The theme's brand colour is near-black here, so the effects use a fixed blue (`#4d6bfe`) instead of `--dsw-alias-brand-primary` or they would vanish into text and borders; the overlay's element outline is what makes a small click still readable at 900 px |
+| **A 1000 px GIF is blurry on a 125% display** | the panel preview is ~978 CSS px = ~1222 device px, so a 1000 px GIF is upscaled 1.22x before it reaches the screen; the GIF was also encoded below the crop's physical width (1470). The width now defaults to `(innerWidth - sidebar) * devicePixelRatio` (1470 here, capped at 1600), and the encoder palette went from 128 to 256 colours. Old 1000 px recordings stay soft; re-record to get the sharper ones |
+| Settings used the wrong surface token | the popover had `--dsw-alias-bg-overlay`, a blue-grey floating surface, while the page is `--dsw-alias-bg-base`; it now uses `bg-base` and matches the page |
 
 ## Window geometry
 

@@ -1097,7 +1097,18 @@ sleep 1200`
       const [preview, setPreview] = useState(null)
       const [script, setScript] = useState(readDraft)
       const [fps, setFps] = useState(6)
-      const [width, setWidth] = useState(1000)
+      // The GIF is encoded at the crop's physical width so the preview is not upscaled: a 1000 px GIF
+      // on a 125% display is stretched past 1200 device pixels and reads as blurry. Capped to keep the
+      // file reasonable; the setting overrides it per run.
+      const [width, setWidth] = useState(() => {
+        try {
+          const dpr = window.devicePixelRatio || 1
+          const content = Math.max(640, window.innerWidth - 360)
+          return Math.max(900, Math.min(1600, Math.round(content * dpr)))
+        } catch {
+          return 1400
+        }
+      })
       const [stills, setStills] = useState('3, 6')
       const [workspaces, setWorkspaces] = useState([])
       const [workspace, setWorkspace] = useState('')
@@ -1499,7 +1510,7 @@ sleep 1200`
                   optionField('截图时间点（秒）', h('input', { className: 'dshr-input', value: stills, onChange: (event) => setStills(event.target.value), 'aria-label': '截图时间点' })),
                 ),
                 h('button', { className: 'dshr-secondary dshr-wide', type: 'button', onClick: () => void fillScreen() }, '铺满当前屏幕'),
-                h('p', { className: 'dshr-hint dshr-settings-note' }, '设置自动保存在本地，作用于下一次录制。'),
+                h('p', { className: 'dshr-hint dshr-settings-note' }, '设置自动保存在本地，作用于下一次录制。GIF 宽度越大越清晰，文件也越大。'),
               ),
             ),
           )
@@ -1628,7 +1639,7 @@ sleep 1200`
 .dshr-record-dot { width: 10px; height: 10px; border-radius: 50%; background: #e5484d; flex: none; }
 .dshr-note-line { margin: 0; text-align: center; font-size: 11.5px; line-height: 1.5; color: var(--dsw-alias-label-secondary); }
 .dshr-backdrop { position: fixed; inset: 0; z-index: 50; background: transparent; }
-.dshr-settings { position: fixed; top: 56px; right: 30px; z-index: 51; width: 380px; max-height: calc(100% - 90px); overflow: auto; background: var(--dsw-alias-bg-overlay); border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.2); }
+.dshr-settings { position: fixed; top: 56px; right: 30px; z-index: 51; width: 380px; max-height: calc(100% - 90px); overflow: auto; background: var(--dsw-alias-bg-base); border: 1px solid var(--dsw-alias-border-l2); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,.2); }
 .dshr-settings-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--dsw-alias-border-l1); }
 .dshr-settings-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .dshr-settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }

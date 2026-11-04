@@ -351,7 +351,7 @@ def activate(hwnd):
 
 
 def assemble_gif(frames_dir, out_dir, width, fps):
-    """One shared palette from a middle frame, 128 colours: the GIF stays small and stable."""
+    """One shared palette from a middle frame, 256 colours: crisp UI text without per-frame palettes."""
     paths = sorted(glob.glob(os.path.join(frames_dir, "f*.png")))
     if not paths:
         return None, 0
@@ -359,7 +359,7 @@ def assemble_gif(frames_dir, out_dir, width, fps):
     ratio = width / first.width
     size = (width, max(1, round(first.height * ratio)))
     images = [Image.open(path).convert("RGB").resize(size, Image.LANCZOS) for path in paths]
-    palette = images[len(images) // 2].quantize(colors=128, method=Image.MEDIANCUT)
+    palette = images[len(images) // 2].quantize(colors=256, method=Image.MEDIANCUT)
     quantized = [image.quantize(palette=palette, dither=Image.NONE) for image in images]
     gif = os.path.join(out_dir, "recording.gif")
     quantized[0].save(
