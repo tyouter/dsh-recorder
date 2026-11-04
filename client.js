@@ -1095,6 +1095,13 @@ sleep 1200`
       const [settingsOpen, setSettingsOpen] = useState(false)
       const [historyPick, setHistoryPick] = useState(null)
       const [preview, setPreview] = useState(null)
+      const [zoom, setZoom] = useState('actual')
+      const [natural, setNatural] = useState({ w: 0, h: 0 })
+      const openPreview = (item) => {
+        setZoom('actual')
+        setNatural({ w: 0, h: 0 })
+        setPreview(item)
+      }
       const [script, setScript] = useState(readDraft)
       const storedNumber = (key, fallback) => {
         try {
@@ -1456,7 +1463,7 @@ sleep 1200`
         error !== '' ? h('div', { className: 'dshr-error' }, error) : null,
         rehearsal !== null ? rehearsalCard(rehearsal) : null,
         result !== null
-          ? resultCard(result, () => void copyPath(result.gif), '本次录制', (item) => setPreview(item))
+          ? resultCard(result, () => void copyPath(result.gif), '本次录制', openPreview)
           : emptyCard('还没有录制结果', '写好脚本，按「开始录制」，结果会显示在这里。'),
       )
 
@@ -1468,7 +1475,7 @@ sleep 1200`
               React.Fragment,
               null,
               h('button', { className: 'dshr-link dshr-back', type: 'button', onClick: () => setHistoryPick(null) }, '← 返回历史列表'),
-              resultCard(historyPick, () => void copyPath(historyPick.gif), '历史录制', (item) => setPreview(item)),
+              resultCard(historyPick, () => void copyPath(historyPick.gif), '历史录制', openPreview),
             )
           : recent.length === 0
             ? emptyCard('还没有录制', '录制一次之后，历史记录会出现在这里。')
@@ -1550,11 +1557,24 @@ sleep 1200`
           ? h(
               'div',
               { className: 'dshr-lightbox', role: 'dialog', 'aria-modal': 'true', 'aria-label': '全尺寸预览', onClick: () => setPreview(null) },
+              h(
+                'div',
+                { className: 'dshr-lightbox-toolbar', onClick: (event) => event.stopPropagation() },
+                h('button', { className: 'dshr-zoom' + (zoom === 'fit' ? ' is-active' : ''), type: 'button', onClick: () => setZoom('fit') }, '适应屏幕'),
+                h('button', { className: 'dshr-zoom' + (zoom === 'actual' ? ' is-active' : ''), type: 'button', onClick: () => setZoom('actual') }, '100%'),
+              ),
               h('img', {
                 className: 'dshr-lightbox-img',
                 src: assetUrl(preview.gif),
                 alt: 'full-size preview',
                 onClick: (event) => event.stopPropagation(),
+                onLoad: (event) => setNatural({ w: event.currentTarget.naturalWidth, h: event.currentTarget.naturalHeight }),
+                // 100% means one GIF pixel per device pixel: the text is the same physical size as the
+                // app was when recorded. Fit shrinks the whole frame into the viewport (smaller text).
+                style:
+                  zoom === 'actual' && natural.w > 0
+                    ? { width: `${natural.w / (window.devicePixelRatio || 1)}px`, maxWidth: 'none', maxHeight: 'none' }
+                    : undefined,
               }),
               h(
                 'button',
@@ -1569,7 +1589,11 @@ sleep 1200`
                 },
                 '✕',
               ),
-              h('span', { className: 'dshr-lightbox-meta' }, `${preview.name ?? (tab === 'record' ? '本次录制' : '历史录制')} · ${preview.seconds ?? '?'}s · 点击空白处或 ✕ 关闭`),
+              h(
+                'span',
+                { className: 'dshr-lightbox-meta' },
+                `${preview.name ?? (tab === 'record' ? '本次录制' : '历史录制')} · ${preview.seconds ?? '?'}s${natural.w > 0 ? ` · ${natural.w}×${natural.h} · ${zoom === 'actual' ? '1:1 设备像素' : '适应窗口'}` : ''} · 点击空白处或 ✕ 关闭`,
+              ),
             )
           : null,
       )
@@ -1712,8 +1736,12 @@ sleep 1200`
 .dshr-shot-button { position: relative; display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; }
 .dshr-shot-button:hover .dshr-shot { filter: brightness(.97); }
 .dshr-shot-zoom { position: absolute; right: 10px; bottom: 10px; padding: 4px 9px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; font-size: 11px; line-height: 1.2; pointer-events: none; }
-.dshr-lightbox { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.84); cursor: zoom-out; }
-.dshr-lightbox-img { display: block; max-width: 96vw; max-height: 88vh; width: auto; height: auto; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.5); background: #fff; cursor: default; }
+.dshr-lightbox { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.84); cursor: zoom-out; overflow: auto; }
+.dshr-lightbox-img { display: block; max-width: 96vw; max-height: 88vh; width: auto; height: auto; margin: auto; border-radius: 8px; box-shadow: 0 20px 60px rgba(0,0,0,.5); background: #fff; cursor: default; }
+.dshr-lightbox-toolbar { position: fixed; top: 56px; left: 50%; transform: translateX(-50%); z-index: 201; display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: rgba(0,0,0,.55); }
+.dshr-zoom { border: 0; background: transparent; color: rgba(255,255,255,.72); font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.dshr-zoom:hover { color: #fff; }
+.dshr-zoom.is-active { background: #fff; color: #111; font-weight: 600; }
 .dshr-lightbox-close { position: fixed; top: 56px; right: 22px; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.16); color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
 .dshr-lightbox-close:hover { background: rgba(255,255,255,.28); }
 .dshr-lightbox-meta { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.78); font-size: 12px; font-variant-numeric: tabular-nums; }

@@ -27,7 +27,7 @@ Sidebar → 「录制器」 opens a page with two tabs.
 | 录制脚本 | The script, front and centre. JSON steps or one step per line (see below); kept in `localStorage` between visits. |
 | 复制给插件 agent 的 prompt | One click copies a self-contained prompt (the full spec + what to output). Paste it into the agent that owns the plugin, describe the demo, and it returns a script you paste back. `载入示例` restores the notes walk that the verified GIF came from. |
 | 开始录制 | The primary action, a large button under the editor. `排练（不录制）` runs the same steps without recording (real clicks, no video); `停止` ends early. A rehearsal brings the window forward first — a background window throttles the page's timers and would freeze the walk. |
-| 本次录制 | The result of this run: a large GIF preview (click it for a full-size lightbox), its length/frames/size, the path, and the per-step log. |
+| 本次录制 | The result of this run: a large GIF preview (click it for a full-size lightbox), its length/frames/size, the path, and the per-step log. The lightbox opens at **100%** — one GIF pixel per device pixel, so the text is exactly the physical size it had on screen; `适应屏幕` fits the whole frame instead (smaller text). |
 
 ![Full-size preview](docs/panel-preview.png)
 
@@ -97,6 +97,10 @@ the **insets in CSS pixels plus `devicePixelRatio`**; the Host maps them through
 client area (Win32 `GetClientRect` + `ClientToScreen`) and crops every frame. The window is still
 maximized for the shoot — the crop is what removes the sidebar and the app title bar, and
 it stays correct on a mixed-DPI desktop because the mapping is measured, not assumed.
+
+Because the crop is the **main panel**, the GIF's aspect ratio is the panel's, not the window's
+(e.g. 1544×970 for a 1920×1020 window). The image is still scaled proportionally; if the framing has
+to match the full window, pick `整个窗口`.
 
 - `整个窗口` records the maximized window as-is (sidebar included).
 - `自定义区域` takes a CSS selector and crops to that element's box; the element must exist when you
