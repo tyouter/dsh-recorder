@@ -1096,11 +1096,15 @@ sleep 1200`
       const [historyPick, setHistoryPick] = useState(null)
       const [preview, setPreview] = useState(null)
       const [script, setScript] = useState(readDraft)
-      const [fps, setFps] = useState(6)
-      // The GIF is encoded at the crop's physical width so the preview is not upscaled: a 1000 px GIF
-      // on a 125% display is stretched past 1200 device pixels and reads as blurry. Capped to keep the
-      // file reasonable; the setting overrides it per run.
-      const [width, setWidth] = useState(() => {
+      const storedNumber = (key, fallback) => {
+        try {
+          const value = Number(localStorage.getItem(key))
+          return Number.isFinite(value) && value > 0 ? value : fallback
+        } catch {
+          return fallback
+        }
+      }
+      const defaultWidth = () => {
         try {
           const dpr = window.devicePixelRatio || 1
           const content = Math.max(640, window.innerWidth - 360)
@@ -1108,8 +1112,26 @@ sleep 1200`
         } catch {
           return 1400
         }
+      }
+      const [fps, setFps] = useState(() => storedNumber('dshr.fps', 6))
+      // The GIF is encoded at the crop's physical width so the preview is not upscaled: a 1000 px GIF
+      // on a 125% display is stretched past 1200 device pixels and reads as blurry. Capped to keep the
+      // file reasonable; a stored value overrides the computed default.
+      const [width, setWidth] = useState(() => storedNumber('dshr.width', defaultWidth()))
+      const [stills, setStills] = useState(() => {
+        try {
+          return localStorage.getItem('dshr.stills') ?? '3, 6'
+        } catch {
+          return '3, 6'
+        }
       })
-      const [stills, setStills] = useState('3, 6')
+      const persist = (key, value) => {
+        try {
+          localStorage.setItem(key, String(value))
+        } catch {
+          /* storage may be unavailable */
+        }
+      }
       const [workspaces, setWorkspaces] = useState([])
       const [workspace, setWorkspace] = useState('')
       const [cropMode, setCropMode] = useState(() => {
@@ -1505,9 +1527,9 @@ sleep 1200`
                 h(
                   'div',
                   { className: 'dshr-settings-grid' },
-                  optionField('帧率', h('input', { className: 'dshr-input', value: fps, inputMode: 'decimal', onChange: (event) => setFps(event.target.value), 'aria-label': '帧率' })),
-                  optionField('GIF 宽度', h('input', { className: 'dshr-input', value: width, inputMode: 'numeric', onChange: (event) => setWidth(event.target.value), 'aria-label': 'GIF 宽度' })),
-                  optionField('截图时间点（秒）', h('input', { className: 'dshr-input', value: stills, onChange: (event) => setStills(event.target.value), 'aria-label': '截图时间点' })),
+                  optionField('帧率', h('input', { className: 'dshr-input', value: fps, inputMode: 'decimal', onChange: (event) => { setFps(event.target.value); persist('dshr.fps', event.target.value) }, 'aria-label': '帧率' })),
+                  optionField('GIF 宽度', h('input', { className: 'dshr-input', value: width, inputMode: 'numeric', onChange: (event) => { setWidth(event.target.value); persist('dshr.width', event.target.value) }, 'aria-label': 'GIF 宽度' })),
+                  optionField('截图时间点（秒）', h('input', { className: 'dshr-input', value: stills, onChange: (event) => { setStills(event.target.value); persist('dshr.stills', event.target.value) }, 'aria-label': '截图时间点' })),
                 ),
                 h('button', { className: 'dshr-secondary dshr-wide', type: 'button', onClick: () => void fillScreen() }, '铺满当前屏幕'),
                 h('p', { className: 'dshr-hint dshr-settings-note' }, '设置自动保存在本地，作用于下一次录制。GIF 宽度越大越清晰，文件也越大。'),
