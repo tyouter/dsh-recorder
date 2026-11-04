@@ -993,9 +993,15 @@ sleep 1200`
       )
     }
 
-    function resultCard(result, onCopy, title = '录制结果', onPreview = null) {
+    function resultCard(result, onCopy, title = '录制结果', onPreview = null, onBroken = null) {
       const log = Array.isArray(result?.walk?.log) ? result.walk.log : []
-      const shot = h('img', { className: 'dshr-shot', src: assetUrl(result?.gif), alt: 'recording' })
+      const shot = h('img', {
+        className: 'dshr-shot',
+        src: assetUrl(result?.gif),
+        alt: 'recording',
+        // A deleted or moved GIF shows as a broken image; the panel drops the whole card instead.
+        onError: onBroken === null ? undefined : () => onBroken(),
+      })
       return h(
         'section',
         { className: 'dshr-card' },
@@ -1209,7 +1215,12 @@ sleep 1200`
         void (async () => {
           const root = await loadWorkspaces()
           const list = await refreshRecent(root)
-          const latest = lastPanelResult ?? list[0]
+          // `lastPanelResult` can outlive the file (deleted, moved, or the module kept across a
+          // remount). Only trust it when the recording is still in the list; otherwise use the
+          // newest real recording, or leave the card empty.
+          const lastGif = lastPanelResult?.gif
+          const known = lastGif !== undefined && list.some((item) => item.gif === lastGif)
+          const latest = known ? lastPanelResult : list[0]
           if (latest) setResult((current) => current ?? latest)
         })()
       }, [])
@@ -1349,12 +1360,22 @@ sleep 1200`
           const payload = await postJson(`${API}/delete`, { path: item.dir })
           if (payload?.ok !== true) throw new Error(payload?.error?.message ?? '删除失败')
           toast('已删除这条录制')
+          if (lastPanelResult?.gif === item.gif) lastPanelResult = null
           if (result?.gif === item.gif) setResult(null)
           setHistoryPick(null)
           await refreshRecent(workspace)
         } catch (problem) {
           toast(`删除失败：${String(problem?.message ?? problem)}`)
         }
+      }
+
+      // The GIF was deleted/moved outside the panel: drop the card and fall back to the newest
+      // recording that still exists, instead of leaving a broken image behind.
+      const clearBrokenResult = () => {
+        lastPanelResult = null
+        setResult(null)
+        setHistoryPick(null)
+        void refreshRecent(workspace)
       }
 
       const fillScreen = async () => {
@@ -1496,7 +1517,7 @@ sleep 1200`
         error !== '' ? h('div', { className: 'dshr-error' }, error) : null,
         rehearsal !== null ? rehearsalCard(rehearsal) : null,
         result !== null
-          ? resultCard(result, () => void copyPath(result.gif), '本次录制', openPreview)
+          ? resultCard(result, () => void copyPath(result.gif), '本次录制', openPreview, clearBrokenResult)
           : emptyCard('还没有录制结果', '写好脚本，按「开始录制」，结果会显示在这里。'),
       )
 
@@ -1521,7 +1542,7 @@ sleep 1200`
                   deleteArmed ? '再点一次确认删除' : '删除这段录制',
                 ),
               ),
-              resultCard(historyPick, () => void copyPath(historyPick.gif), '历史录制', openPreview),
+              resultCard(historyPick, () => void copyPath(historyPick.gif), '历史录制', openPreview, clearBrokenResult),
             )
           : recent.length === 0
             ? emptyCard('还没有录制', '录制一次之后，历史记录会出现在这里。')
