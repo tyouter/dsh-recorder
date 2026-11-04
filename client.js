@@ -208,9 +208,70 @@ window.__ModuleLoader__.load({
       return new Event(kind ?? 'input', { bubbles: true, cancelable: true })
     }
 
+    /**
+     * React and rich-text editors (ProseMirror/Lexical) key off the input event's data and inputType;
+     * a bare Event leaves them thinking the field is still empty. InputEvent carries both.
+     */
+    function fireInput(node, data, inputType = 'insertText') {
+      let event
+      try {
+        event = new window.InputEvent('input', { bubbles: true, cancelable: false, data: data ?? null, inputType })
+      } catch {
+        event = new Event('input', { bubbles: true })
+      }
+      node.dispatchEvent(event)
+    }
+
+    /** The browser's own insert path — the only one contenteditable editors reliably observe. */
+    function insertTextAtCaret(text) {
+      try {
+        if (typeof document.execCommand !== 'function') return false
+        return document.execCommand('insertText', false, text) !== false
+      } catch {
+        return false
+      }
+    }
+
+    /** Insert into a textarea/input at its caret, like paste does. */
+    function insertIntoField(node, text) {
+      const value = typeof node.value === 'string' ? node.value : ''
+      const start = typeof node.selectionStart === 'number' ? node.selectionStart : value.length
+      const end = typeof node.selectionEnd === 'number' ? node.selectionEnd : value.length
+      nativeSetValue(node, value.slice(0, start) + text + value.slice(end))
+      try {
+        node.setSelectionRange(start + text.length, start + text.length)
+      } catch {
+        /* some inputs have no selection API */
+      }
+      fireInput(node, text, 'insertText')
+    }
+
     function setValueNow(node, value) {
+      if (node.isContentEditable === true) {
+        focusLikeHuman(node)
+        try {
+          document.execCommand('selectAll', false, null)
+        } catch {
+          /* no selection support */
+        }
+        const next = String(value ?? '')
+        // insertText('') is a no-op; an empty set must delete the selection instead.
+        if (next === '') {
+          try {
+            document.execCommand('delete', false, null)
+          } catch {
+            node.textContent = ''
+          }
+          return
+        }
+        if (!insertTextAtCaret(next)) {
+          node.textContent = next
+          fireInput(node, next, 'insertText')
+        }
+        return
+      }
       nativeSetValue(node, value)
-      node.dispatchEvent(inputEvent('input'))
+      fireInput(node, value, 'insertText')
       node.dispatchEvent(inputEvent('change'))
     }
 
@@ -277,12 +338,24 @@ window.__ModuleLoader__.load({
       await sleep(180)
       const text = String(value ?? '')
       const delay = Math.max(8, Math.min(Number(delayMs) || 60, 400))
+      if (node.isContentEditable === true) {
+        for (const character of [...text]) {
+          if (isStopRequested()) throw new Error('stopped by the user')
+          if (!insertTextAtCaret(character)) {
+            node.textContent = `${node.textContent ?? ''}${character}`
+            fireInput(node, character, 'insertText')
+          }
+          await sleep(delay)
+        }
+        scheduleCursorHide()
+        return { chars: [...text].length, ms: delay }
+      }
       let current = typeof node.value === 'string' ? node.value : ''
       for (const character of [...text]) {
         if (isStopRequested()) throw new Error('stopped by the user')
         current += character
         nativeSetValue(node, current)
-        node.dispatchEvent(inputEvent('input'))
+        fireInput(node, character, 'insertText')
         await sleep(delay)
       }
       scheduleCursorHide()
@@ -516,6 +589,24 @@ window.__ModuleLoader__.load({
         setValueNow(node, String(step.text ?? ''))
         scheduleCursorHide()
         return { detail: `set ${String(step.text ?? '').length} chars` }
+      }
+      if (op === 'paste') {
+        // Browser-inserted text, for contenteditable editors the host owns (ProseMirror/Lexical):
+        // no value setter, and the editor only updates from insertText + an input event with data.
+        focusLikeHuman(node)
+        await sleep(140)
+        const text = String(step.text ?? '')
+        if (node.isContentEditable === true) {
+          if (!insertTextAtCaret(text)) {
+            node.textContent = `${node.textContent ?? ''}${text}`
+            fireInput(node, text, 'insertText')
+          }
+        } else {
+          insertIntoField(node, text)
+        }
+        scheduleCursorHide()
+        await sleep(180)
+        return { detail: `pasted ${[...text].length} chars` }
       }
       if (op === 'key') {
         const result = await pressKey(node, step)
@@ -811,6 +902,7 @@ window.__ModuleLoader__.load({
       type: 'type',
       set: 'setValue',
       setValue: 'setValue',
+      paste: 'paste',
       key: 'key',
       select: 'select',
       wait: 'wait',
@@ -829,7 +921,7 @@ window.__ModuleLoader__.load({
       const rawOp = parts.shift() ?? ''
       const op = OP_ALIASES[rawOp]
       if (op === undefined) {
-        throw new Error(`第 ${lineNo} 行：不认识的指令「${rawOp}」。可用：open / click / type / set / select / wait / sleep / key / scroll / focus`)
+        throw new Error(`第 ${lineNo} 行：不认识的指令「${rawOp}」。可用：open / click / type / set / paste / select / wait / sleep / key / scroll / focus`)
       }
       const step = { op }
       if (op === 'openPanel') {
@@ -907,6 +999,7 @@ sleep 1200`
 - click <选择器> [| 文字]    点击；文字用于在多个匹配里挑，优先用按钮上可见的文字。
 - type <选择器> | 文字       逐字输入（约 60ms/字），\\n 表示换行。
 - set <选择器> | 文字        一次性赋值；清空输入框写成 set <选择器> |（竖线后留空）。
+- paste <选择器> | 文字       把文字粘贴进输入框（富文本 contenteditable 用这个）。
 - select <选择器> | 文字     选中这段文字（用于展示划选/翻译）。
 - wait <选择器> [毫秒]       等元素出现，默认 8000。
 - sleep <毫秒>               停顿。
@@ -922,6 +1015,7 @@ sleep 1200`
 节奏与安全：
 - 切换面板/长操作后加 wait 或 sleep（300–900ms），让画面跟得上。
 - 打字前先 click 输入框；先 set 清空再 type，保证可重放。
+- 宿主会话的提问框是富文本 contenteditable（不是 textarea），对它用 paste 或 type，不要用 set。
 - 8–15 步、10–20 秒为宜。
 - 不要保存/删除/提交/发消息/调用模型或消耗 token；演示应可重复、无副作用（除非我明确要求展示保存）。
 

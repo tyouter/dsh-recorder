@@ -42,7 +42,8 @@ sleep 1200
 | `open <panel>` | `openPanel` | `panel` | 切到插件主面板（`main` 的 key，如 `notes`、`wuche`） |
 | `click <sel> [| 文字]` | `click` | `selector`, `text` | 点击。`文字` 用于在多个匹配里挑（可见文案） |
 | `type <sel> | 文字` | `type` | `selector`,`text`（`ms` 可设每字毫秒，默认 60） | 逐字输入，`\n` 换行 |
-| `set <sel> | 文字` | `setValue` | `selector`,`text` | 一次性赋值；`set x |`（竖线后空）表示清空 |
+| `set <sel> | 文字` | `setValue` | `selector`,`text` | 一次性赋值；`set x |`（竖线后空）表示清空。只用于 textarea/input |
+| `paste <sel> | 文字` | `paste` | `selector`,`text` | 把文字插入输入框（走浏览器 `insertText`）；富文本 contenteditable 用这个 |
 | `select <sel> | 文字` | `select` | `selector`,`text` 或 `from`,`to` | 选中文字（字符下标也可） |
 | `wait <sel> [毫秒]` | `wait` | `selector`,`timeoutMs` | 等元素可见，默认 8000 |
 | `sleep <毫秒>` | `sleep` | `ms` | 停顿 |
@@ -69,6 +70,7 @@ JSON 的 `steps` 里还可以加 `strict: true`（由调用方传入，不在步
 
 - 切面板、长耗时操作后加 `wait` 或 `sleep`（300–900 ms），否则画面和操作不同步。
 - 打字前先 `click` 输入框；可重放的脚本应先 `set … |` 清空，再 `type`。
+- 宿主会话的提问框是 contenteditable；用 `paste` / `type`，不要用 `set`。
 - 8–15 步、10–20 秒为宜；超过 20 步通常该拆成两条。
 - **不要**保存、删除、提交、发消息、调用模型或消耗 token；演示应可重复、无副作用。用户明确要求展示“保存”时才做，并在文案里说明。
 - 失败步骤默认继续：录制不会因为一个可选按钮消失而整段中断；演示里重要的步骤前用 `wait` 兜底。
@@ -89,7 +91,7 @@ JSON 的 `steps` 里还可以加 `strict: true`（由调用方传入，不在步
 | --- | --- | --- |
 | `no visible element matches …` | 选择器不存在/被折叠 | 先 `open` + `wait` 根元素；确认类名 |
 | 点错按钮 | 选择器命中多个 | 加 `| 文字`，或用更具体的类名 |
-| 打字没反应 | 输入框不是 textarea/input | 用 `click` 聚焦 + `key`；或先看 `recorder_scan` 的标签 |
+| 打字没反应 | 输入框是富文本 contenteditable（如宿主的提问框），旧版 set 改不动它 | 用 `paste`（或 `type`，现已走 insertText + InputEvent） |
 | 画面停在旧面板 | 切面板后没等 | 在 `open` 后 `wait` 面板根元素 |
 | 中文变成 `?` | 脚本以非 UTF-8 编码写入 | 用面板/工具直接传字符串，不要经 ANSI 编码的 shell |
 | 录制里出现别的应用 | 录制中焦点被抢 | 结果会带 `⚠`；重录时让 Harness 窗口保持前台 |
