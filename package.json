@@ -1,7 +1,6 @@
 {
   "name": "@tyouter/dsh-recorder",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "Drive another DSH plugin's real interface like a person and record the real window to GIF or stills.",
   "license": "MIT",
