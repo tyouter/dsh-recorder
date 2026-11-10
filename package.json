@@ -5,6 +5,18 @@
   "description": "Drive another DSH plugin's real interface like a person and record the real window to GIF or stills.",
   "license": "MIT",
   "author": "tyouter",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tyouter/dsh-recorder.git"
+  },
+  "homepage": "https://github.com/tyouter/dsh-recorder#readme",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "recorder",
+    "gif",
+    "demo"
+  ],
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
